@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Upload File</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+        <link rel="stylesheet" href="/static/home.css" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    </head>
+    <body>
+        <nav>
+            <div class="nav-wrapper">
+                <a href="#" class="brand-logo">Upload Files</a>
+                <form
+                    id="fileUploadForm" 
+                    method="POST"
+                    action="/upload" 
+                    class="right file-input" 
+                    enctype="multipart/form-data">
+                    <div class="file-field input-field">
+                        <div class="btn">
+                            <span>Select File</span>
+                            <input type="file" onchange="fileUpload()" name="file">
+                        </div>
+                        <div class="file-path-wrapper">
+                            <input class="file-path validate" type="text">
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </nav>
+        
+        <script>
+            function fileUpload() {
+                document.getElementById('fileUploadForm')
+                    .submit()
+            }
+        </script>
+    </body>
+</html>
