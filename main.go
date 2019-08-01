@@ -1,10 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"path/filepath"
+	"text/template"
+
+	"github.com/Azure/azure-storage-blob-go/azblob"
 )
 
 const maxUploadSize = 2 * 1024 * 1024 * 1024 // 2 mb
@@ -23,11 +26,29 @@ func main() {
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "templates/home.html")
+
+	blobs, err := listBlobs()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	lp := filepath.Join("templates", "home.html")
+
+	tmpl, err := template.ParseFiles(lp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	tmpl.ExecuteTemplate(w, "home", struct {
+		Blobs []azblob.BlobItem
+	}{
+		blobs,
+	})
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	//r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
 	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
 		http.Error(w, "FILE_TOO_BIG", http.StatusBadRequest)
 		return
@@ -45,7 +66,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ioutil.WriteFile(fmt.Sprintf("uploads/%s", handler.Filename), fileBytes, 0644)
+	//ioutil.WriteFile(fmt.Sprintf("uploads/%s", handler.Filename), fileBytes, 0644)
+	err = uploadToStorageBlob(handler.Filename, fileBytes)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
 
-	w.Write([]byte("done"))
+	http.Redirect(w, r, "/", 302)
 }
