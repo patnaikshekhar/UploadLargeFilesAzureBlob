@@ -10,13 +10,14 @@ import (
 	"github.com/Azure/azure-storage-blob-go/azblob"
 )
 
-const maxUploadSize = 2 * 1024 * 1024 * 1024 // 2 mb
+const maxUploadSize = 4 * 1024 * 1024 * 1024 // 4GB
 
 func main() {
 
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
+	http.HandleFunc("/sas", sasHandler)
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/", homeHandler)
 	err := http.ListenAndServe("0.0.0.0:8080", nil)
@@ -73,4 +74,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/", 302)
+}
+
+func sasHandler(w http.ResponseWriter, r *http.Request) {
+	filename := r.FormValue("filename")
+
+	url := getSAS(filename)
+
+	w.Write([]byte(url))
 }

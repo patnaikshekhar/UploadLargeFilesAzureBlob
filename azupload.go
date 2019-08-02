@@ -3,21 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 )
 
 const containerName = "bigfiles"
 
-func getContainerURL() (*azblob.ContainerURL, error) {
+func getCredentials() (string, *azblob.SharedKeyCredential, *azblob.ContainerURL, error) {
 	accountName := os.Getenv("AZ_ACCOUNT_NAME")
 	accountKey := os.Getenv("AZ_ACCOUNT_KEY")
 
 	credential, err := azblob.NewSharedKeyCredential(accountName, accountKey)
 	if err != nil {
-		return nil, err
+		return "", nil, nil, err
 	}
 
 	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
@@ -27,11 +29,12 @@ func getContainerURL() (*azblob.ContainerURL, error) {
 
 	containerURL := azblob.NewContainerURL(*URL, p)
 
-	return &containerURL, nil
+	return accountName, credential, &containerURL, nil
 }
+
 func uploadToStorageBlob(fileName string, contents []byte) error {
 
-	containerURL, err := getContainerURL()
+	_, _, containerURL, err := getCredentials()
 	if err != nil {
 		return err
 	}
@@ -52,7 +55,7 @@ func listBlobs() ([]azblob.BlobItem, error) {
 
 	ctx := context.Background()
 
-	containerURL, err := getContainerURL()
+	_, _, containerURL, err := getCredentials()
 	if err != nil {
 		return nil, err
 	}
@@ -74,4 +77,31 @@ func listBlobs() ([]azblob.BlobItem, error) {
 	}
 
 	return result, nil
+}
+
+func getSAS(filename string) string {
+	accountName, credential, _, err := getCredentials()
+	if err != nil {
+		log.Println(err.Error())
+	}
+
+	sasQueryParams, err := azblob.BlobSASSignatureValues{
+		Protocol:      azblob.SASProtocolHTTPS,              // Users MUST use HTTPS (not HTTP)
+		ExpiryTime:    time.Now().UTC().Add(48 * time.Hour), // 48-hours before expiration
+		ContainerName: containerName,
+		BlobName:      filename,
+
+		Permissions: azblob.BlobSASPermissions{Add: true, Read: true, Write: true}.String(),
+	}.NewSASQueryParameters(credential)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	qp := sasQueryParams.Encode()
+
+	url := fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s?%s",
+		accountName, containerName, filename, qp)
+
+	return url
 }
