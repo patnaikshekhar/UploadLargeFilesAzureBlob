@@ -1,4 +1,4 @@
-# Upload Large Files Azure Blob
+# Upload Large Files to Azure Blob
 
 This is a sample repository thats demonstrates uploading large files (> 1GB) to a Azure Storage Blob.
 
