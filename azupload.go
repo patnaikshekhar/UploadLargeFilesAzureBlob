@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"net/url"
 	"os"
 	"sync"
@@ -34,7 +35,7 @@ func getCredentials() (string, string, *azblob.SharedKeyCredential, *azblob.Cont
 	return accountName, containerName, credential, &containerURL, nil
 }
 
-func uploadToStorageBlob(fileName string, contents []byte) error {
+func uploadToStorageBlob(fileName string, file multipart.File) error {
 
 	log.Printf("Starting to upload file %s", fileName)
 
@@ -49,14 +50,22 @@ func uploadToStorageBlob(fileName string, contents []byte) error {
 
 	blobURL := containerURL.NewBlockBlobURL(fileName)
 
-	_, err = azblob.UploadBufferToBlockBlob(ctx, contents, blobURL, azblob.UploadToBlockBlobOptions{
-		BlockSize:   4 * 1024 * 1024,
-		Parallelism: 16,
-		Progress: func(bytesTransferred int64) {
-			percentage := float64(bytesTransferred) / float64(len(contents)) * 100
-			progress.Store(fileName, int(percentage))
-		},
+	bufferSize := 2 * 1024 * 1024
+	maxBuffers := 3
+
+	_, err = azblob.UploadStreamToBlockBlob(ctx, file, blobURL, azblob.UploadStreamToBlockBlobOptions{
+		BufferSize: bufferSize,
+		MaxBuffers: maxBuffers,
 	})
+
+	// _, err = azblob.UploadBufferToBlockBlob(ctx, contents, blobURL, azblob.UploadToBlockBlobOptions{
+	// 	BlockSize:   4 * 1024 * 1024,
+	// 	Parallelism: 16,
+	// 	Progress: func(bytesTransferred int64) {
+	// 		percentage := float64(bytesTransferred) / float64(len(contents)) * 100
+	// 		progress.Store(fileName, int(percentage))
+	// 	},
+	// })
 
 	progress.Delete(fileName)
 
