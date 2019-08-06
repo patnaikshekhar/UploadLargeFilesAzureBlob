@@ -55,7 +55,6 @@ func uploadToStorageBlob(fileName string, contents []byte) error {
 		Progress: func(bytesTransferred int64) {
 			percentage := float64(bytesTransferred) / float64(len(contents)) * 100
 			progress.Store(fileName, int(percentage))
-			// log.Printf("File %s - Percentage uploaded %d", fileName, progress[fileName])
 		},
 	})
 
