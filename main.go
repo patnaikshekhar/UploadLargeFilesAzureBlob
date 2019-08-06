@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"text/template"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
@@ -19,6 +20,7 @@ func main() {
 
 	http.HandleFunc("/sas", sasHandler)
 	http.HandleFunc("/upload", uploadHandler)
+	http.HandleFunc("/progress", progressHandler)
 	http.HandleFunc("/", homeHandler)
 	err := http.ListenAndServe("0.0.0.0:8080", nil)
 	if err != nil {
@@ -82,4 +84,15 @@ func sasHandler(w http.ResponseWriter, r *http.Request) {
 	url := getSAS(filename)
 
 	w.Write([]byte(url))
+}
+
+func progressHandler(w http.ResponseWriter, r *http.Request) {
+	fileName := r.URL.Query()["file"][0]
+
+	if val, ok := progress[fileName]; ok {
+		w.Write([]byte(strconv.Itoa(val)))
+		return
+	}
+
+	http.Error(w, "File not found", 404)
 }
