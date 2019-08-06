@@ -89,8 +89,8 @@ func sasHandler(w http.ResponseWriter, r *http.Request) {
 func progressHandler(w http.ResponseWriter, r *http.Request) {
 	fileName := r.URL.Query()["file"][0]
 
-	if val, ok := progress[fileName]; ok {
-		w.Write([]byte(strconv.Itoa(val)))
+	if val, ok := progress.Load(fileName); ok {
+		w.Write([]byte(strconv.Itoa(val.(int))))
 		return
 	}
 

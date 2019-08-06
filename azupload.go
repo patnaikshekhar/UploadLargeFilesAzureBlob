@@ -6,12 +6,13 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 )
 
-var progress map[string]int
+var progress sync.Map
 
 func getCredentials() (string, string, *azblob.SharedKeyCredential, *azblob.ContainerURL, error) {
 	accountName := os.Getenv("AZ_ACCOUNT_NAME")
@@ -37,11 +38,7 @@ func uploadToStorageBlob(fileName string, contents []byte) error {
 
 	log.Printf("Starting to upload file %s", fileName)
 
-	if progress == nil {
-		progress = make(map[string]int)
-	}
-
-	progress[fileName] = 0
+	progress.Store(fileName, 0)
 
 	_, _, _, containerURL, err := getCredentials()
 	if err != nil {
@@ -57,12 +54,12 @@ func uploadToStorageBlob(fileName string, contents []byte) error {
 		Parallelism: 16,
 		Progress: func(bytesTransferred int64) {
 			percentage := float64(bytesTransferred) / float64(len(contents)) * 100
-			progress[fileName] = int(percentage)
+			progress.Store(fileName, int(percentage))
 			// log.Printf("File %s - Percentage uploaded %d", fileName, progress[fileName])
 		},
 	})
 
-	delete(progress, fileName)
+	progress.Delete(fileName)
 
 	log.Printf("Completed uploading. Errors are %v", err)
 
