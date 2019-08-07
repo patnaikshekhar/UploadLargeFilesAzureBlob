@@ -6,20 +6,22 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
 )
 
-const containerName = "bigfiles"
+var progress sync.Map
 
-func getCredentials() (string, *azblob.SharedKeyCredential, *azblob.ContainerURL, error) {
+func getCredentials() (string, string, *azblob.SharedKeyCredential, *azblob.ContainerURL, error) {
 	accountName := os.Getenv("AZ_ACCOUNT_NAME")
 	accountKey := os.Getenv("AZ_ACCOUNT_KEY")
+	containerName := os.Getenv("AZ_CONTAINER_NAME")
 
 	credential, err := azblob.NewSharedKeyCredential(accountName, accountKey)
 	if err != nil {
-		return "", nil, nil, err
+		return "", "", nil, nil, err
 	}
 
 	p := azblob.NewPipeline(credential, azblob.PipelineOptions{})
@@ -29,12 +31,16 @@ func getCredentials() (string, *azblob.SharedKeyCredential, *azblob.ContainerURL
 
 	containerURL := azblob.NewContainerURL(*URL, p)
 
-	return accountName, credential, &containerURL, nil
+	return accountName, containerName, credential, &containerURL, nil
 }
 
 func uploadToStorageBlob(fileName string, contents []byte) error {
 
-	_, _, containerURL, err := getCredentials()
+	log.Printf("Starting to upload file %s", fileName)
+
+	progress.Store(fileName, 0)
+
+	_, _, _, containerURL, err := getCredentials()
 	if err != nil {
 		return err
 	}
@@ -46,7 +52,15 @@ func uploadToStorageBlob(fileName string, contents []byte) error {
 	_, err = azblob.UploadBufferToBlockBlob(ctx, contents, blobURL, azblob.UploadToBlockBlobOptions{
 		BlockSize:   4 * 1024 * 1024,
 		Parallelism: 16,
+		Progress: func(bytesTransferred int64) {
+			percentage := float64(bytesTransferred) / float64(len(contents)) * 100
+			progress.Store(fileName, int(percentage))
+		},
 	})
+
+	progress.Delete(fileName)
+
+	log.Printf("Completed uploading. Errors are %v", err)
 
 	return err
 }
@@ -55,7 +69,7 @@ func listBlobs() ([]azblob.BlobItem, error) {
 
 	ctx := context.Background()
 
-	_, _, containerURL, err := getCredentials()
+	_, _, _, containerURL, err := getCredentials()
 	if err != nil {
 		return nil, err
 	}
@@ -76,11 +90,13 @@ func listBlobs() ([]azblob.BlobItem, error) {
 		}
 	}
 
+	log.Printf("Completed listBlobs. Found %d blobs.", len(result))
+
 	return result, nil
 }
 
 func getSAS(filename string) string {
-	accountName, credential, _, err := getCredentials()
+	accountName, containerName, credential, _, err := getCredentials()
 	if err != nil {
 		log.Println(err.Error())
 	}
