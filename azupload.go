@@ -4,17 +4,22 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"net/url"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-blob-go/azblob"
 )
 
 var progress sync.Map
 
-func getCredentials() (string, string, *azblob.SharedKeyCredential, *azblob.ContainerURL, error) {
+func getCredentials() (
+	string, string,
+	*azblob.SharedKeyCredential, *azblob.ContainerURL, error) {
+
 	accountName := os.Getenv("AZ_ACCOUNT_NAME")
 	accountKey := os.Getenv("AZ_ACCOUNT_KEY")
 	containerName := os.Getenv("AZ_CONTAINER_NAME")
@@ -34,7 +39,7 @@ func getCredentials() (string, string, *azblob.SharedKeyCredential, *azblob.Cont
 	return accountName, containerName, credential, &containerURL, nil
 }
 
-func uploadToStorageBlob(fileName string, contents []byte) error {
+func uploadToStorageBlob(fileName string, file multipart.File, size int64) error {
 
 	log.Printf("Starting to upload file %s", fileName)
 
@@ -49,14 +54,20 @@ func uploadToStorageBlob(fileName string, contents []byte) error {
 
 	blobURL := containerURL.NewBlockBlobURL(fileName)
 
-	_, err = azblob.UploadBufferToBlockBlob(ctx, contents, blobURL, azblob.UploadToBlockBlobOptions{
-		BlockSize:   4 * 1024 * 1024,
-		Parallelism: 16,
-		Progress: func(bytesTransferred int64) {
-			percentage := float64(bytesTransferred) / float64(len(contents)) * 100
+	bufferSize := 2 * 1024 * 1024
+	maxBuffers := 3
+
+	_, err = azblob.UploadStreamToBlockBlob(
+		ctx,
+		pipeline.NewRequestBodyProgress(file, func(bytesTransferred int64) {
+			percentage := float64(bytesTransferred) / float64(size) * 100
 			progress.Store(fileName, int(percentage))
-		},
-	})
+		}),
+		blobURL,
+		azblob.UploadStreamToBlockBlobOptions{
+			BufferSize: bufferSize,
+			MaxBuffers: maxBuffers,
+		})
 
 	progress.Delete(fileName)
 
