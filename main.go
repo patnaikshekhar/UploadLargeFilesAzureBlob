@@ -62,14 +62,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	// fileBytes, err := ioutil.ReadAll(file)
-	// if err != nil {
-	// 	http.Error(w, "INVALID_FILE", http.StatusBadRequest)
-	// 	return
-	// }
 
-	//ioutil.WriteFile(fmt.Sprintf("uploads/%s", handler.Filename), fileBytes, 0644)
-	err = uploadToStorageBlob(handler.Filename, file)
+	err = uploadToStorageBlob(handler.Filename, file, handler.Size)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
